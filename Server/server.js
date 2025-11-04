@@ -29,12 +29,13 @@ app.use('/employer', authenticateToken, employerRoutes);
 app.use('/jobseeker', authenticateToken, jobSeekerRoutes);
 
 // ---------- Serve React Frontend ----------
-const staticPath = path.join(__dirname, 'Client/Jobify/dist');
+const staticPath = path.join(__dirname, '../Client/Jobify/dist'); 
 app.use(express.static(staticPath));
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(staticPath, 'index.html'));
 });
+
 // -----------------------------------------
 
 const PORT = process.env.PORT || 5000;
