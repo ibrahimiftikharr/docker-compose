@@ -8,17 +8,11 @@ pipeline {
             }
         }
 
-        stage('Build in Docker Containers') {
+        stage('Build and Run Containers') {
             steps {
-                sh 'docker-compose down'
+                sh 'docker-compose down || true'
                 sh 'docker-compose up --build -d'
             }
-        }
-    }
-
-    post {
-        always {
-            sh 'docker-compose down'
         }
     }
 }
