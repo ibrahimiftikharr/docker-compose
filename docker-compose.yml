@@ -9,7 +9,7 @@ services:
       - ./Client/Jobify/dist:/app/Client/Jobify/dist  # React build
     command: sh -c "cd Server && node server.js"
     ports:
-      - "8082:5000"
+      - "8082:5000"                                 # External access to server
     environment:
       - PORT=5000
       - MONGO_URL=mongodb://mongo:27017/jobify
@@ -20,8 +20,6 @@ services:
     image: mongo:6
     container_name: mongo-for-jenkins
     restart: always
-    ports:
-      - "27017:27017"
     volumes:
       - mongo-data:/data/db
 
