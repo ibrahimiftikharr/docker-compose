@@ -11,32 +11,31 @@ const jobSeekerRoutes = require('./routes/jobSeekerRoutes');
 
 const app = express();
 
-// Middlewares
-app.use(cors({ origin: '*' }));
+// ---------- Middlewares ----------
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// Connect to MongoDB
-mongoose.connect('mongodb://127.0.0.1:27017/jobify')
+// ---------- Connect to MongoDB ----------
+mongoose.connect(process.env.MONGO_URL, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
   .then(() => console.log('✅ Connected to MongoDB'))
   .catch(err => console.error('❌ MongoDB connection error:', err));
 
-
-// API Routes
-// API Routes
+// ---------- API Routes ----------
 app.use('/auth', authRoutes);
 app.use('/employer', authenticateToken, employerRoutes);
 app.use('/jobseeker', authenticateToken, jobSeekerRoutes);
 
 // ---------- Serve React Frontend ----------
-const __dirnamePath = path.resolve();
-app.use(express.static(path.join(__dirnamePath, '../Client/Jobify/dist')));
+const staticPath = path.join(__dirname, 'Client/Jobify/dist');
+app.use(express.static(staticPath));
 
-// Catch-all for React Router
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirnamePath, '../Client/Jobify/dist', 'index.html'));
+  res.sendFile(path.join(staticPath, 'index.html'));
 });
 // -----------------------------------------
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
