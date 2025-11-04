@@ -1,0 +1,8 @@
+{
+  "name": "jobify-monorepo",
+  "version": "1.0.0",
+  "scripts": {
+    "postinstall": "cd Server && npm install",
+    "start": "node Server/server.js"
+  }
+}
