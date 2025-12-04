@@ -15,6 +15,7 @@ const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
+
 // ---------- Connect to MongoDB ----------
 mongoose.connect(process.env.MONGO_URL, {
   useNewUrlParser: true,
