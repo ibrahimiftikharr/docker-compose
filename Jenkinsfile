@@ -21,22 +21,28 @@ pipeline {
         }
 
 
-        stage('Run Selenium Tests') {
+stage('Run Selenium Tests') {
     agent {
         docker {
             image 'markhobson/maven-chrome'
-            args '-u root:root -v /var/lib/jenkins/.m2:/root/.m2 -v ${WORKSPACE}/test-cases/target:/var/lib/jenkins/workspace/Jobify-CI@2/test-cases/target --entrypoint=""'
+            args """
+                -u root:root
+                -v /var/lib/jenkins/.m2:/root/.m2
+                -v ${WORKSPACE}/test-cases/target:/var/lib/jenkins/workspace/Jobify-CI@2/test-cases/target
+                --entrypoint=""
+            """
         }
     }
     steps {
         dir('test-cases') {
             git branch: 'master', url: 'https://github.com/ibrahimiftikharr/test-cases.git'
-            sh 'pwd && ls -la'
-            sh 'mvn test -DskipITs=true'
+            // ✅ clean old reports so only fresh ones exist
+            sh 'mvn clean test -DskipITs=true -Dsurefire.reportDirectory=/var/lib/jenkins/workspace/Jobify-CI@2/test-cases/target/surefire-reports'
+            sh 'ls -la target/surefire-reports'  // check if XMLs are generated
         }
     }
 }
-
+        
         stage('Publish Test Results') {
             steps {
                 // publish reports from the host-side path (Jenkins will find them since agent returned)
