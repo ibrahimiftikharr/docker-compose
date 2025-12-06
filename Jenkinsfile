@@ -5,20 +5,19 @@ pipeline {
     }
    
     stages {
-        // -----------------------------
         stage('Clone Application Repository') {
             steps {
                 git branch: 'master', url: 'https://github.com/ibrahimiftikharr/docker-compose.git'
             }
         }
-        // -----------------------------
+
         stage('Build and Run Containers') {
             steps {
                 sh 'docker-compose down --remove-orphans || true'
                 sh 'docker-compose up --build -d'
             }
         }
-        // -----------------------------
+
         stage('Clone Test Repository') {
             steps {
                 dir('tests') {
@@ -26,92 +25,96 @@ pipeline {
                 }
             }
         }
-        // -----------------------------
+
         stage('Run Selenium Tests') {
             agent {
                 docker {
-                    image 'markhobson/maven-chrome'
-                    args '-u root:root -v /var/lib/jenkins/.m2:/root/.m2'
+                    image 'markhobson/maven-chrome:jdk-11'  // more stable than latest
+                    args '-u root:root -v /var/lib/jenkins/.m2:/root/.m2 --network jobify-ci_default'
                 }
             }
             steps {
-                dir('tests') {
-                    // Adjust 'selenium' to the actual subdirectory containing pom.xml
-                    dir('selenium') {
-                        sh 'mvn test'
-                    }
+                dir('tests') {                     // ← pom.xml is here
+                    sh 'mvn -B test'               // -B = batch mode, cleaner logs
                 }
             }
         }
-        // -----------------------------
+
         stage('Publish Test Results') {
             steps {
-                // Adjust path to match the test subdirectory
-                junit 'tests/selenium/target/surefire-reports/*.xml'
+                junit 'tests/target/surefire-reports/*.xml'
             }
         }
     }
-    // ==========================
+
     post {
         always {
             script {
                 try {
-                    sh "git config --global --add safe.directory ${env.WORKSPACE}"
-                    // Committer email of the LAST docker-compose commit
-                    def committer = sh(
-                        script: "git log -1 --pretty=format:'%ae'",
-                        returnStdout: true
-                    ).trim()
-                    
-                    // Use find + xargs for robust file handling; ignore if no files
-                    def raw = sh(
-                        script: "find tests -name '*.xml' -path '*/surefire-reports/*.xml' -exec grep '<testcase' {} + || true",
-                        returnStdout: true
-                    ).trim()
-                    
-                    int total = 0
-                    int passed = 0
-                    int failed = 0
-                    int skipped = 0
+                    // Get committer email from the app repo (docker-compose)
+                    def committer = sh(script: "git log -1 --pretty=format:'^(?!.*Jenkinsfile).*$' --pretty=format:%ae", returnStdout: true).trim()
+                    if (!committer) {
+                        committer = 'ibrahimiftikharr@hotmail.com' // fallback
+                    }
+
+                    // Safely extract test results even if some files are missing
+                    def reportFiles = findFiles(glob: 'tests/target/surefire-reports/*.xml')
                     def details = ""
-                    if (raw) {
-                        raw.split('\n').each { line ->
-                            total++
-                            def nameMatcher = (line =~ /name=\"([^\"]+)\"/)
-                            def name = nameMatcher ? nameMatcher[0][1] : 'Unknown'
-                            if (line.contains("<failure")) {
-                                failed++
-                                details += "${name} — FAILED\n"
-                            } else if (line.contains("<skipped") || line.contains("</skipped>")) {
-                                skipped++
-                                details += "${name} — SKIPPED\n"
-                            } else {
-                                passed++
-                                details += "${name} — PASSED\n"
+                    def total = 0
+                    def passed = 0
+                    def failed = 0
+                    def skipped = 0
+
+                    if (reportFiles.length == 0) {
+                        details = "No test reports generated. Tests likely failed to execute."
+                    } else {
+                        reportFiles.each { file ->
+                            def content = readFile(file.path)
+                            def testcases = content.findAll(/<testcase[^>]*>/)
+                            testcases.each { tc ->
+                                total++
+                                def name = (tc =~ /name="([^"]+)"/)[0][1]
+                                if (content.contains("<failure") || content.contains("<error")) {
+                                    failed++
+                                    details += "${name} — FAILED\n"
+                                } else if (tc.contains('skipped="true"') || content.contains("<skipped")) {
+                                    skipped++
+                                    details += "${name} — SKIPPED\n"
+                                } else {
+                                    passed++
+                                    details += "${name} — PASSED\n"
+                                }
                             }
                         }
-                    } else {
-                        total = 0
-                        details = "No test reports found (tests may have failed to run)."
                     }
-                    
+
                     def emailBody = """
-Test Summary (Build #${env.BUILD_NUMBER})
+Jobify CI - Build #${env.BUILD_NUMBER}
+Status: ${currentBuild.currentResult}
 Total Tests: ${total}
 Passed: ${passed}
 Failed: ${failed}
 Skipped: ${skipped}
+
 Detailed Results:
 ${details}
+
+Jenkins URL: ${env.BUILD_URL}
 """
+
                     emailext(
                         to: committer,
-                        subject: "Build #${env.BUILD_NUMBER} Test Results",
-                        body: emailBody
+                        subject: "Jobify CI #${env.BUILD_NUMBER} - ${currentBuild.currentResult}",
+                        body: emailBody,
+                        mimeType: 'text/plain'
                     )
                 } catch (Exception e) {
-                    echo "Post-actions encountered an error: ${e.getMessage()}. Pipeline still considered complete."
+                    echo "Email/notification failed: ${e.message}"
+                    // Don't fail the build just because email failed
                 }
+
+                // Clean up containers after tests
+                sh 'docker-compose down --remove-orphans || true'
             }
         }
     }
