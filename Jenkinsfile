@@ -1,5 +1,10 @@
 pipeline {
-    agent any
+    agent { label 'master' }
+
+    options {
+        disableConcurrentBuilds()
+        skipDefaultCheckout(true)
+    }
 
     triggers {
         githubPush()
@@ -9,7 +14,11 @@ pipeline {
 
         stage('Clone Application Repository') {
             steps {
-                git branch: 'master', url: 'https://github.com/ibrahimiftikharr/docker-compose.git'
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "*/master"]],
+                    userRemoteConfigs: [[url: "https://github.com/ibrahimiftikharr/docker-compose.git"]]
+                ])
             }
         }
 
@@ -23,7 +32,11 @@ pipeline {
         stage('Clone Test Repository') {
             steps {
                 dir('tests') {
-                    git branch: 'master', url: 'https://github.com/ibrahimiftikharr/test-cases.git'
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: "*/master"]],
+                        userRemoteConfigs: [[url: "https://github.com/ibrahimiftikharr/test-cases.git"]]
+                    ])
                 }
             }
         }
