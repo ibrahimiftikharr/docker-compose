@@ -91,7 +91,7 @@ pipeline {
                 def emailBody = """
                     <html>
                     <body style="font-family: Arial, sans-serif; line-height: 1.6;">
-                        <h2 style="color: ${color};">Jobify CI – Build #${env.BUILD_NUMBER}</h2>
+                        <h2 style="color: ${color};">FA22-BCS-062 Jobify CI – Build #${env.BUILD_NUMBER}</h2>
                         <p><strong>Status:</strong> <span style="color:${color}; font-size:20px;">${currentBuild.currentResult}</span></p>
                         <p><strong>Triggered by:</strong> ${currentBuild.getBuildCauses()[0].shortDescription}</p>
                         <p><strong>Duration:</strong> ${currentBuild.durationString}</p>
@@ -119,7 +119,7 @@ pipeline {
 
                 emailext(
                     to: committer,
-                    subject: "Jobify-CI #${env.BUILD_NUMBER} – ${currentBuild.currentResult} (${passed}/${total} Passed)",
+                    subject: "Jobify-CI #${env.BUILD_NUMBER} FA22-BCS-062 – ${currentBuild.currentResult} (${passed}/${total} Passed)",
                     body: emailBody,
                     mimeType: 'text/html',
                     attachLog: true,
