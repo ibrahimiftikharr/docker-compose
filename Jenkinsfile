@@ -2,17 +2,19 @@ pipeline {
     agent any
 
     triggers {
-        githubPush() // Trigger on GitHub push
+        githubPush()
     }
 
     stages {
-        // =======================
+
+        // -----------------------------
         stage('Clone Application Repository') {
             steps {
                 git branch: 'master', url: 'https://github.com/ibrahimiftikharr/docker-compose.git'
             }
         }
 
+        // -----------------------------
         stage('Build and Run Containers') {
             steps {
                 sh 'docker-compose down || true'
@@ -20,19 +22,16 @@ pipeline {
             }
         }
 
-        // =======================
+        // -----------------------------
         stage('Clone Test Repository') {
-            agent {
-                docker {
-                    image 'markhobson/maven-chrome'
-                    args '-u root:root -v /var/lib/jenkins/.m2:/root/.m2'
-                }
-            }
             steps {
-                git branch: 'master', url: 'https://github.com/ibrahimiftikharr/test-cases.git'
+                dir('tests') {
+                    git branch: 'master', url: 'https://github.com/ibrahimiftikharr/test-cases.git'
+                }
             }
         }
 
+        // -----------------------------
         stage('Run Selenium Tests') {
             agent {
                 docker {
@@ -41,35 +40,34 @@ pipeline {
                 }
             }
             steps {
-                sh 'mvn test'
+                dir('tests') {
+                    sh 'mvn test'
+                }
             }
         }
 
+        // -----------------------------
         stage('Publish Test Results') {
-            agent {
-                docker {
-                    image 'markhobson/maven-chrome'
-                    args '-u root:root -v /var/lib/jenkins/.m2:/root/.m2'
-                }
-            }
             steps {
-                junit '**/target/surefire-reports/*.xml'
+                junit 'tests/target/surefire-reports/*.xml'
             }
         }
     }
 
+    // ==========================
     post {
         always {
             script {
-                // Get commit author email
                 sh "git config --global --add safe.directory ${env.WORKSPACE}"
+
+                // Committer email of the LAST docker-compose commit
                 def committer = sh(
                     script: "git log -1 --pretty=format:'%ae'",
                     returnStdout: true
                 ).trim()
 
                 def raw = sh(
-                    script: "grep -h \"<testcase\" target/surefire-reports/*.xml",
+                    script: "grep -h \"<testcase\" tests/target/surefire-reports/*.xml",
                     returnStdout: true
                 ).trim()
 
@@ -107,6 +105,7 @@ Skipped:       ${skipped}
 Detailed Results:
 ${details}
 """
+
                 emailext(
                     to: committer,
                     subject: "Build #${env.BUILD_NUMBER} Test Results",
