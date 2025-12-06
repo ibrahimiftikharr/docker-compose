@@ -8,7 +8,7 @@ pipeline {
                 git branch: 'master', url: 'https://github.com/ibrahimiftikharr/docker-compose.git'
                 sh 'docker-compose down --remove-orphans || true'
                 sh 'docker-compose up --build -d'
-                sh 'sleep 20' // give MERN app time to start
+                sh 'sleep 5' // give MERN app time to start
             }
         }
 
@@ -127,8 +127,6 @@ pipeline {
                 )
             }
 
-            // Clean up
-            sh 'docker-compose down --remove-orphans || true'
         }
     }
 }
