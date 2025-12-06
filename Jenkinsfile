@@ -29,7 +29,7 @@ pipeline {
                 }
             }
             steps {
-                git branch: 'main', url: 'https://github.com/ibrahimiftikharr/test-cases.git'
+                git branch: 'master', url: 'https://github.com/ibrahimiftikharr/test-cases.git'
             }
         }
 
