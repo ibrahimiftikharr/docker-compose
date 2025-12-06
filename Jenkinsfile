@@ -1,40 +1,25 @@
 pipeline {
-
     agent any
-
-    triggers {
-        githubPush()
-    }
+    triggers { githubPush() }
 
     stages {
-
-        /* ------------------------------------------------------------------
-         * STAGE 1: Clone application repo and run Docker containers
-         * ------------------------------------------------------------------ */
         stage('Clone & Run App Containers') {
             steps {
                 git branch: 'master', url: 'https://github.com/ibrahimiftikharr/docker-compose.git'
-
                 sh 'docker-compose down || true'
                 sh 'docker-compose up --build -d'
             }
         }
 
-        /* ------------------------------------------------------------------
-         * STAGE 2: Clone test cases repo
-         * ------------------------------------------------------------------ */
-        stage('Clone Test Cases') {
+        stage('Clone Test Cases (host)') {
             steps {
-                // clone test repo inside a separate folder
+                // keep a host-side copy for logs/inspection
                 dir('test-cases') {
                     git branch: 'master', url: 'https://github.com/ibrahimiftikharr/test-cases.git'
                 }
             }
         }
 
-        /* ------------------------------------------------------------------
-         * STAGE 3: Run Selenium Tests in Docker (headless Chrome)
-         * ------------------------------------------------------------------ */
         stage('Run Selenium Tests') {
             agent {
                 docker {
@@ -43,41 +28,49 @@ pipeline {
                 }
             }
             steps {
+                // IMPORTANT: checkout inside the docker container workspace so pom.xml is present
                 dir('test-cases') {
-                    sh 'mvn test'
+                    // Do fresh checkout inside container to ensure files are present in the container's workspace
+                    git branch: 'master', url: 'https://github.com/ibrahimiftikharr/test-cases.git'
+
+                    // show files for debugging (optional)
+                    sh 'pwd && ls -la'
+
+                    // run tests
+                    sh 'mvn test -DskipITs=true'
                 }
             }
         }
 
-        /* ------------------------------------------------------------------
-         * STAGE 4: Publish JUnit Report
-         * ------------------------------------------------------------------ */
         stage('Publish Test Results') {
             steps {
+                // publish reports from the host-side path (Jenkins will find them since agent returned)
                 junit 'test-cases/target/surefire-reports/*.xml'
             }
         }
     }
 
-    /* ------------------------------------------------------------------
-     * POST: Email test results to the committer who pushed the repo
-     * ------------------------------------------------------------------ */
     post {
         always {
             script {
-                // Identify the email of the person who pushed the commit
-                sh "git config --global --add safe.directory ${env.WORKSPACE}"
+                // safe: if test-cases exists and has commits, get committer; otherwise fallback to env.BUILD_USER_EMAIL or empty
+                def committer = ''
+                dir('test-cases') {
+                    if (fileExists('.git')) {
+                        // try to get the last commit author email; if repo empty, handle gracefully
+                        try {
+                            committer = sh(script: "git log -1 --pretty=format:'%ae' || true", returnStdout: true).trim()
+                        } catch (err) {
+                            committer = ''
+                        }
+                    }
+                }
 
-                def committer = sh(
-                    script: "cd test-cases && git log -1 --pretty=format:'%ae'",
-                    returnStdout: true
-                ).trim()
-
-                // Parse test results
-                def raw = sh(
-                    script: "grep -h \"<testcase\" test-cases/target/surefire-reports/*.xml",
-                    returnStdout: true
-                ).trim()
+                // safer grep: only run if reports dir exists; use || true to avoid non-zero exit
+                def raw = ''
+                if (fileExists('test-cases/target/surefire-reports')) {
+                    raw = sh(script: "grep -h \"<testcase\" test-cases/target/surefire-reports/*.xml || true", returnStdout: true).trim()
+                }
 
                 int total = 0
                 int passed = 0
@@ -85,23 +78,23 @@ pipeline {
                 int skipped = 0
                 def details = ""
 
-                raw.split('\n').each { line ->
-                    total++
-                    def name = (line =~ /name=\"([^\"]+)\"/)[0][1]
-
-                    if (line.contains("<failure")) {
-                        failed++
-                        details += "${name} — FAILED\n"
-                    } else if (line.contains("<skipped") || line.contains("</skipped>")) {
-                        skipped++
-                        details += "${name} — SKIPPED\n"
-                    } else {
-                        passed++
-                        details += "${name} — PASSED\n"
+                if (raw) {
+                    raw.split('\\n').each { line ->
+                        total++
+                        def m = (line =~ /name=\"([^\"]+)\"/)
+                        def name = m ? m[0][1] : "UnnamedTest"
+                        if (line.contains("<failure")) {
+                            failed++; details += "${name} — FAILED\n"
+                        } else if (line.contains("<skipped") || line.contains("</skipped>")) {
+                            skipped++; details += "${name} — SKIPPED\n"
+                        } else {
+                            passed++; details += "${name} — PASSED\n"
+                        }
                     }
+                } else {
+                    details = "No test results found (no surefire XML files)."
                 }
 
-                // Prepare email
                 def emailBody = """
 Test Summary (Build #${env.BUILD_NUMBER})
 
@@ -114,12 +107,13 @@ Detailed Results:
 ${details}
 """
 
-                // Send email
-                emailext(
-                    to: committer,
-                    subject: "Build #${env.BUILD_NUMBER} – Selenium Test Results",
-                    body: emailBody
-                )
+                // if committer empty, you may set a default email or skip emailext
+                if (committer) {
+                    emailext(to: committer, subject: "Build #${env.BUILD_NUMBER} – Selenium Test Results", body: emailBody)
+                } else {
+                    // fallback: email to job owner or just print to console
+                    echo "No committer email found; not sending email. Test summary:\n${emailBody}"
+                }
             }
         }
     }
