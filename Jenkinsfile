@@ -20,27 +20,22 @@ pipeline {
             }
         }
 
+
         stage('Run Selenium Tests') {
-            agent {
-                docker {
-                    image 'markhobson/maven-chrome'
-                    args '-u root:root -v /var/lib/jenkins/.m2:/root/.m2'
-                }
-            }
-            steps {
-                // IMPORTANT: checkout inside the docker container workspace so pom.xml is present
-                dir('test-cases') {
-                    // Do fresh checkout inside container to ensure files are present in the container's workspace
-                    git branch: 'master', url: 'https://github.com/ibrahimiftikharr/test-cases.git'
-
-                    // show files for debugging (optional)
-                    sh 'pwd && ls -la'
-
-                    // run tests
-                    sh 'mvn test -DskipITs=true'
-                }
-            }
+    agent {
+        docker {
+            image 'markhobson/maven-chrome'
+            args '-u root:root -v /var/lib/jenkins/.m2:/root/.m2 --entrypoint="" -v ${WORKSPACE}/test-cases/target:${WORKSPACE}/test-cases/target'
         }
+    }
+    steps {
+        dir('test-cases') {
+            git branch: 'master', url: 'https://github.com/ibrahimiftikharr/test-cases.git'
+            sh 'pwd && ls -la'
+            sh 'mvn test -DskipITs=true'
+        }
+    }
+}
 
         stage('Publish Test Results') {
             steps {
