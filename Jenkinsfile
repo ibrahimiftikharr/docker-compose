@@ -25,7 +25,7 @@ pipeline {
     agent {
         docker {
             image 'markhobson/maven-chrome'
-            args '-u root:root -v /var/lib/jenkins/.m2:/root/.m2 --entrypoint="" -v ${WORKSPACE}/test-cases/target:${WORKSPACE}/test-cases/target'
+            args '-u root:root -v /var/lib/jenkins/.m2:/root/.m2 -v ${WORKSPACE}/test-cases/target:/var/lib/jenkins/workspace/Jobify-CI@2/test-cases/target --entrypoint=""'
         }
     }
     steps {
