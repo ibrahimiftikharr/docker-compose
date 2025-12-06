@@ -1,11 +1,12 @@
-pipeline { 
-    
+pipeline 
+{ 
 
 
     agent any
     triggers { githubPush() }
 
-    stages {
+    stages
+    {
         stage('Clone & Run App Containers') 
       {
             steps {
@@ -14,6 +15,8 @@ pipeline {
                 sh 'docker-compose up --build -d'
             }
         }
+
+    }
 
 
 
