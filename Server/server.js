@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 
+//configs
 const authenticateToken = require('./middleware/authenticateToken');
 const authRoutes = require('./routes/authRoutes');
 const employerRoutes = require('./routes/employerRoutes');
