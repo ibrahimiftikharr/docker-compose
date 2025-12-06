@@ -1,10 +1,11 @@
 pipeline {
-    agent {
-        docker {
-            image 'markhobson/maven-chrome'
-            args '-u root:root -v /var/lib/jenkins/.m2:/root/.m2'
-        }
+agent {
+    docker {
+        image 'selenium/standalone-chrome:latest'
+        args '-u root:root -v /var/lib/jenkins/.m2:/root/.m2'
     }
+}
+
 
     stages {
         stage('Clone Repository') {
