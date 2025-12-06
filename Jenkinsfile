@@ -27,7 +27,7 @@ pipeline {
             steps {
                 // clone test repo inside a separate folder
                 dir('test-cases') {
-                    git branch: 'main', url: 'https://github.com/ibrahimiftikharr/test-cases.git'
+                    git branch: 'master', url: 'https://github.com/ibrahimiftikharr/test-cases.git'
                 }
             }
         }
