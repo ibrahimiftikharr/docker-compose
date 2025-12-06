@@ -11,6 +11,7 @@ const jobSeekerRoutes = require('./routes/jobSeekerRoutes');
 
 const app = express();
 
+
 // ---------- Middlewares ----------
 app.use(cors({ origin: '*' }));
 app.use(express.json());
