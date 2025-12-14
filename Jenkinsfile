@@ -49,31 +49,41 @@ pipeline {
             script {
 
                 /* -----------------------------
-                   Resolve Email Recipients
+                   Collect commit emails
                 ------------------------------ */
 
-                def committerEmail = ''
+                def emails = []
+
+                // docker-compose repo (workspace root)
+                if (fileExists('.git')) {
+                    def e1 = sh(
+                        script: "git log -1 --pretty=format:%ae",
+                        returnStdout: true
+                    ).trim()
+                    if (e1) emails << e1
+                }
+
+                // test-cases repo
                 dir('test-cases') {
                     if (fileExists('.git')) {
-                        committerEmail = sh(
+                        def e2 = sh(
                             script: "git log -1 --pretty=format:%ae",
                             returnStdout: true
                         ).trim()
+                        if (e2) emails << e2
                     }
                 }
 
-                def ownerEmail = 'therentmates@gmail.com'   // CI admin / repo owner
-                def recipients = []
+                // Always notify owner/admin
+                emails << 'therentmates@gmail.com'
 
-                if (committerEmail) {
-                    recipients.add(committerEmail)
-                }
-                recipients.add(ownerEmail)
+                // Remove duplicates + empty values
+                def recipients = emails.findAll { it }.unique().join(',')
 
-                recipients = recipients.unique().join(',')
+                echo "Email recipients resolved: ${recipients}"
 
                 /* -----------------------------
-                   Parse Test Results
+                   Parse test results
                 ------------------------------ */
 
                 def raw = ''
@@ -109,10 +119,12 @@ pipeline {
                 }
 
                 /* -----------------------------
-                   Email Formatting
+                   Email formatting
                 ------------------------------ */
 
-                def color = currentBuild.currentResult == 'SUCCESS' ? '#28a745' : '#dc3545'
+                def color = currentBuild.currentResult == 'SUCCESS'
+                            ? '#28a745'
+                            : '#dc3545'
 
                 def emailBody = """
                 <html>
@@ -163,7 +175,7 @@ ${details}
                 """
 
                 /* -----------------------------
-                   Send Email
+                   Send email
                 ------------------------------ */
 
                 emailext(
